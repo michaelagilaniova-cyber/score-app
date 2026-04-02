@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0891b2">
+  <title>Score</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Score">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; color: #111827; }
+    
+    .container { max-width: 480px; margin: 0 auto; background: #ffffff; min-height: 100vh; display: flex; flex-direction: column; }
+    
+    header { background: #0891b2; color: white; padding: 16px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 20px; font-weight: bold; }
+    
+    .page { display: none; flex: 1; overflow-y: auto; }
+    .page.active { display: flex; flex-direction: column; }
+    
+    .content { flex: 1; padding: 16px; }
+    .footer { padding: 16px; border-top: 1px solid #e5e7eb; background: white; }
+    
+    button { padding: 12px 16px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+    button.primary { background: #0891b2; color: white; }
+    button.primary:hover { background: #0e7490; }
+    button.secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    button.danger { background: #fee2e2; color: #dc2626; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #0891b2; box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1); }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin: 8px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    
+    .score-button { padding: 12px; font-size: 18px; font-weight: black; border-radius: 8px; }
+    .score-button.filled { background: #0891b2; color: white; }
+    .score-button.empty { background: #f3f4f6; color: #9ca3af; border: 2px dashed #d1d5db; }
+    .score-button.selected { box-shadow: 0 0 0 4px #06b6d4; transform: scale(1.1); }
+    
+    .target-svg { width: 200px; height: 200px; border: 2px solid #d1d5db; border-radius: 12px; margin: 16px auto; }
+    
+    .stat-box { background: #ecfdf5; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; text-align: center; }
+    .stat-box .number { font-size: 28px; font-weight: black; color: #0891b2; }
+    .stat-box .label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
+    
+    .archer-item { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
+    
+    .history-item { background: #f9fafb; border-left: 4px solid #0891b2; padding: 12px; margin: 8px 0; border-radius: 4px; }
+    
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 16px; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 25px rgba(0,0,0,0.15); }
+    .modal-content h2 { margin-bottom: 16px; }
+    .modal-content button { width: 100%; margin: 8px 0; }
+    
+    .offline-badge { background: #fee2e2; color: #dc2626; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+    
+    .hit { width: 10px; height: 10px; border-radius: 50%; position: absolute; border: 2px solid white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <button onclick="goHome()" style="background: transparent; border: none; color: white; padding: 8px;">←</button>
+      <h1 id="headerTitle">Score</h1>
+      <span id="offlineBadge" style="display:none;" class="offline-badge">OFFLINE</span>
+    </header>
+
+    <!-- PAGE 1: HOME -->
+    <div id="page1" class="page active">
+      <div class="content">
+        <div class="card">
+          <h2>➕ Pridať strelca</h2>
+          <input type="text" id="archerName" placeholder="Meno lukostrelca">
+          <div class="grid-2">
+            <button onclick="saveFavorite()" class="secondary">⭐ Do obľúbených</button>
+            <button onclick="addArcher()" class="primary">Dnes strieľa</button>
+          </div>
+        </div>
+
+        <div id="favoritesSection" style="display:none;">
+          <h3 style="color: #6b7280; font-size: 12px; text-transform: uppercase; margin-top: 16px;">Obľúbení strelci</h3>
+          <div id="favoritesList"></div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+            <h3 style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Dnes strieľajú</h3>
+            <button id="clearBtn" onclick="clearArchers()" style="background: none; border: none; color: #dc2626; font-size: 12px; padding: 0;">Vymazať</button>
+          </div>
+          <div id="archersList"></div>
+        </div>
+
+        <div>
+          <h3 style="color: #6b7280; font-size: 12px; text-transform: uppercase; margin-top: 16px;">História tréningov</h3>
+          <div id="historyList"></div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button id="startBtn" class="primary" style="width: 100%;" disabled onclick="goToSetup()">Nové nastavenie →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 2: SETUP -->
+    <div id="page2" class="page">
+      <div class="content">
+        <div class="card">
+          <h2>Nastavenie tréningu</h2>
+          
+          <label>Typ terča</label>
+          <div class="grid-2">
+            <button id="btn3d" class="secondary" onclick="setTargetType('3D')">3D Terč</button>
+            <button id="btnTerc" class="secondary" onclick="setTargetType('Terč')">Klasický Terč</button>
+          </div>
+
+          <label style="margin-top: 16px;">Počet terčov</label>
+          <input type="number" id="numTargets" value="28" min="1">
+
+          <label>Počet šípov na terč</label>
+          <div class="grid-4">
+            <button class="secondary" onclick="setArrows(1)">1</button>
+            <button class="secondary" onclick="setArrows(2)">2</button>
+            <button class="secondary" onclick="setArrows(3)">3</button>
+            <button class="secondary" onclick="setArrows(6)">6</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="primary" style="width: 100%;" onclick="startRound()">Začať tréning →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 3: SHOOTING -->
+    <div id="page3" class="page">
+      <div class="content">
+        <div style="background: #0e7490; color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">
+          <div style="font-size: 14px; opacity: 0.8;">Terč <span id="targetNum">1</span> / <span id="totalTargets">28</span></div>
+          <div style="font-size: 20px; font-weight: black;">Strelec: <span id="archerNameDisplay">-</span></div>
+        </div>
+
+        <!-- SCORE DISPLAY -->
+        <div class="card">
+          <div style="text-align: center; margin-bottom: 12px; font-size: 12px; color: #6b7280; text-transform: uppercase;">Hodnoty výstrelov</div>
+          <div class="grid-4" id="scoreDisplay"></div>
+        </div>
+
+        <!-- TARGET INTERACTIVE -->
+        <div class="card">
+          <div style="text-align: center; margin-bottom: 12px; font-size: 12px; color: #6b7280; text-transform: uppercase;">Ťuknite na terč</div>
+          <svg id="targetSvg" class="target-svg" viewBox="0 0 100 100"></svg>
+        </div>
+
+        <!-- SCORE BUTTONS -->
+        <div class="card">
+          <div style="text-align: center; margin-bottom: 12px; font-size: 12px; color: #6b7280; text-transform: uppercase;">Alebo použite tlačidlá</div>
+          <div id="scoreButtons"></div>
+        </div>
+
+        <!-- STATS -->
+        <div class="grid-2">
+          <div class="stat-box">
+            <div class="label">Celkom</div>
+            <div class="number" id="totalScore">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Priemer</div>
+            <div class="number" id="avgScore">0.00</div>
+          </div>
+        </div>
+
+        <!-- DISTANCE & NOTES -->
+        <div class="card">
+          <label>Poznámka</label>
+          <textarea id="noteInput" placeholder="Zlý postoj, vietor..."></textarea>
+          
+          <label style="margin-top: 16px;">Fotografia</label>
+          <input type="file" id="photoInput" accept="image/*" capture="environment">
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="primary" style="width: 100%;" onclick="nextArcher()">Ďalej →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 4: RESULTS -->
+    <div id="page4" class="page">
+      <div class="content">
+        <h2>Výsledky</h2>
+        <div id="resultsList"></div>
+      </div>
+
+      <div class="footer">
+        <button class="primary" style="width: 100%; margin-bottom: 8px;" onclick="saveRound()">💾 Uložiť</button>
+        <button class="danger" style="width: 100%;" onclick="goHome()">🗑️ Zahodiť</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <h2>Potvrdenie</h2>
+      <p id="confirmMessage"></p>
+      <button class="secondary" onclick="closeModal()" style="width: 100%;">Zrušiť</button>
+      <button id="confirmBtn" class="danger" style="width: 100%; margin-top: 8px;">Áno</button>
+    </div>
+  </div>
+
+  <script>
+    // ===== STATE =====
+    let state = {
+      archers: [],
+      favorites: [],
+      history: [],
+      targetType: '3D',
+      numTargets: 28,
+      arrowsPerTarget: 2,
+      currentRound: null,
+      currentTargetIndex: 0,
+      currentArcherIndex: 0,
+      isOffline: !navigator.onLine
+    };
+
+    // ===== LOCAL STORAGE =====
+    function saveState() {
+      localStorage.setItem('scoreState', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('scoreState');
+      if (saved) {
+        state = { ...state, ...JSON.parse(saved) };
+      }
+      updateUI();
+    }
+
+    // ===== NAVIGATION =====
+    function showPage(pageNum) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page' + pageNum).classList.add('active');
+    }
+
+    function goHome() {
+      showPage(1);
+      updateUI();
+    }
+
+    function goToSetup() {
+      showPage(2);
+    }
+
+    // ===== ARCHERS =====
+    function addArcher() {
+      const name = document.getElementById('archerName').value.trim();
+      if (!name) return alert('Zadajte meno');
+      
+      state.archers.push({ name, scores: [], photos: [], notes: [] });
+      document.getElementById('archerName').value = '';
+      saveState();
+      updateUI();
+    }
+
+    function saveFavorite() {
+      const name = document.getElementById('archerName').value.trim();
+      if (!name) return alert('Zadajte meno');
+      
+      if (!state.favorites.includes(name)) {
+        state.favorites.push(name);
+        saveState();
+      }
+      updateUI();
+    }
+
+    function removeFavorite(name) {
+      state.favorites = state.favorites.filter(f => f !== name);
+      saveState();
+      updateUI();
+    }
+
+    function addFavoriteAsArcher(name) {
+      if (!state.archers.find(a => a.name === name)) {
+        state.archers.push({ name, scores: [], photos: [], notes: [] });
+        saveState();
+        updateUI();
+      }
+    }
+
+    function clearArchers() {
+      if (confirm('Vymazať všetkých strelcov?')) {
+        state.archers = [];
+        saveState();
+        updateUI();
+      }
+    }
+
+    // ===== ROUND SETUP =====
+    function setTargetType(type) {
+      state.targetType = type;
+      updateUI();
+    }
+
+    function setArrows(num) {
+      state.arrowsPerTarget = num;
+      updateUI();
+    }
+
+    function startRound() {
+      state.numTargets = parseInt(document.getElementById('numTargets').value) || 28;
+      
+      state.currentRound = {
+        id: Date.now(),
+        date: new Date().toLocaleString('sk-SK'),
+        targetType: state.targetType,
+        numTargets: state.numTargets,
+        arrowsPerTarget: state.arrowsPerTarget,
+        targets: []
+      };
+
+      for (let i = 0; i < state.numTargets; i++) {
+        state.currentRound.targets.push({
+          scores: {},
+          notes: {},
+          photos: {}
+        });
+      }
+
+      state.currentTargetIndex = 0;
+      state.currentArcherIndex = 0;
+      saveState();
+      showPage(3);
+      renderShooting();
+    }
+
+    // ===== SHOOTING =====
+    function renderShooting() {
+      const target = state.currentRound.targets[state.currentTargetIndex];
+      const archer = state.archers[state.currentArcherIndex];
+
+      document.getElementById('targetNum').textContent = state.currentTargetIndex + 1;
+      document.getElementById('totalTargets').textContent = state.numTargets;
+      document.getElementById('archerNameDisplay').textContent = archer.name;
+
+      // Score display
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      scoreDisplay.innerHTML = '';
+      for (let i = 0; i < state.arrowsPerTarget; i++) {
+        const score = target.scores[archer.name]?.[i];
+        const btn = document.createElement('button');
+        btn.textContent = score !== undefined ? score : '-';
+        btn.className = score !== undefined ? 'score-button filled' : 'score-button empty';
+        btn.onclick = () => selectScore(i);
+        scoreDisplay.appendChild(btn);
+      }
+
+      // Score buttons
+      const scoreButtons = document.getElementById('scoreButtons');
+      scoreButtons.innerHTML = '';
+      const buttons = state.targetType === '3D' ? [11, 10, 8, 5, 0] : [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+      
+      const grid = state.targetType === '3D' ? 'grid-5' : 'grid-5';
+      scoreButtons.className = grid;
+
+      buttons.forEach(score => {
+        const btn = document.createElement('button');
+        btn.textContent = score;
+        btn.className = 'score-button';
+        btn.style.background = getScoreColor(score, state.targetType);
+        btn.onclick = () => addScore(score);
+        scoreButtons.appendChild(btn);
+      });
+
+      // Target SVG
+      renderTarget();
+
+      // Stats
+      updateStats();
+    }
+
+    function getScoreColor(score, targetType) {
+      if (targetType === '3D') {
+        if (score === 11) return '#fcd34d';
+        if (score === 10) return '#67e8f9';
+        if (score === 8) return '#f9a8d4';
+        if (score === 5) return '#e5e7eb';
+        return '#ffffff';
+      }
+      if (score >= 9) return '#facc15';
+      if (score >= 7) return '#ef4444';
+      if (score >= 5) return '#06b6d4';
+      if (score >= 3) return '#1f2937';
+      return '#ffffff';
+    }
+
+    function addScore(score) {
+      const target = state.currentRound.targets[state.currentTargetIndex];
+      const archer = state.archers[state.currentArcherIndex];
+
+      if (!target.scores[archer.name]) target.scores[archer.name] = [];
+      if (target.scores[archer.name].length < state.arrowsPerTarget) {
+        target.scores[archer.name].push(score);
+        saveState();
+        renderShooting();
+      }
+    }
+
+    function selectScore(index) {
+      // Možnosť upraviť skóre - nateraz len zobrazenie
+    }
+
+    function renderTarget() {
+      const svg = document.getElementById('targetSvg');
+      svg.innerHTML = '';
+
+      if (state.targetType === '3D') {
+        // 3D target
+        svg.innerHTML = `
+          <rect x="10" y="10" width="80" height="80" rx="5" fill="#d4d4d8" stroke="#a1a1aa" stroke-width="1"/>
+          <ellipse cx="50" cy="50" rx="25" ry="20" fill="#a1a1aa" stroke="#71717a" stroke-width="1"/>
+          <circle cx="50" cy="50" r="12" fill="none" stroke="#3f3f46" stroke-width="1"/>
+          <circle cx="50" cy="50" r="4" fill="none" stroke="#27272a" stroke-width="1"/>
+        `;
+      } else {
+        // Classic rings
+        const rings = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5];
+        const colors = ['#ffffff', '#ffffff', '#222222', '#222222', '#06b6d4', '#06b6d4', '#ef4444', '#ef4444', '#eab308', '#eab308'];
+        
+        rings.forEach((r, i) => {
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', '50');
+          circle.setAttribute('cy', '50');
+          circle.setAttribute('r', r);
+          circle.setAttribute('fill', colors[i]);
+          circle.setAttribute('stroke', i % 2 === 0 ? '#000000' : '#ffffff');
+          circle.setAttribute('stroke-width', '0.3');
+          svg.appendChild(circle);
+        });
+      }
+
+      svg.onclick = (e) => clickTarget(e);
+    }
+
+    function clickTarget(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+      // Calculate score based on click position
+      const dx = x - 50;
+      const dy = y - 50;
+      const r = Math.sqrt(dx * dx + dy * dy);
+
+      let score = 0;
+      if (state.targetType === '3D') {
+        if (r <= 4) score = 11;
+        else if (r <= 12) score = 10;
+        else if (r <= 25) score = 8;
+        else if (r <= 45) score = 5;
+        else score = 0;
+      } else {
+        if (r <= 5) score = 10;
+        else if (r <= 10) score = 9;
+        else if (r <= 15) score = 8;
+        else if (r <= 20) score = 7;
+        else if (r <= 25) score = 6;
+        else if (r <= 30) score = 5;
+        else if (r <= 35) score = 4;
+        else if (r <= 40) score = 3;
+        else if (r <= 45) score = 2;
+        else if (r <= 50) score = 1;
+        else score = 0;
+      }
+
+      addScore(score);
+    }
+
+    function updateStats() {
+      const target = state.currentRound.targets[state.currentTargetIndex];
+      const archer = state.archers[state.currentArcherIndex];
+      const scores = target.scores[archer.name] || [];
+
+      const total = scores.reduce((a, b) => a + b, 0);
+      const avg = scores.length ? (total / scores.length).toFixed(2) : '0.00';
+
+      document.getElementById('totalScore').textContent = total;
+      document.getElementById('avgScore').textContent = avg;
+    }
+
+    function nextArcher() {
+      state.currentArcherIndex++;
+      if (state.currentArcherIndex >= state.archers.length) {
+        state.currentArcherIndex = 0;
+        state.currentTargetIndex++;
+      }
+
+      if (state.currentTargetIndex >= state.numTargets) {
+        showPage(4);
+        renderResults();
+      } else {
+        renderShooting();
+      }
+
+      saveState();
+    }
+
+    // ===== RESULTS =====
+    function renderResults() {
+      const resultsList = document.getElementById('resultsList');
+      resultsList.innerHTML = '';
+
+      const results = [];
+      state.archers.forEach(archer => {
+        let total = 0;
+        state.currentRound.targets.forEach(target => {
+          const scores = target.scores[archer.name] || [];
+          total += scores.reduce((a, b) => a + b, 0);
+        });
+        results.push({ name: archer.name, total });
+      });
+
+      results.sort((a, b) => b.total - a.total);
+
+      results.forEach((r, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: bold; font-size: 16px;">${i + 1}. ${r.name}</div>
+              <div style="color: #6b7280; font-size: 12px;">Priemer: ${(r.total / state.numTargets).toFixed(2)}</div>
+            </div>
+            <div style="font-size: 32px; font-weight: black; color: #0891b2;">${r.total}</div>
+          </div>
+        `;
+        resultsList.appendChild(div);
+      });
+    }
+
+    function saveRound() {
+      state.history.push({
+        id: state.currentRound.id,
+        date: state.currentRound.date,
+        type: state.targetType,
+        targets: state.numTargets,
+        data: state.currentRound
+      });
+
+      state.currentRound = null;
+      state.archers = [];
+      saveState();
+      goHome();
+    }
+
+    // ===== UI =====
+    function updateUI() {
+      // Update archers list
+      const archersList = document.getElementById('archersList');
+      archersList.innerHTML = '';
+      document.getElementById('startBtn').disabled = state.archers.length === 0;
+      document.getElementById('clearBtn').style.display = state.archers.length > 0 ? 'block' : 'none';
+
+      state.archers.forEach((archer, i) => {
+        const div = document.createElement('div');
+        div.className = 'archer-item';
+        div.innerHTML = `
+          <div>
+            <div style="font-weight: bold;">${i + 1}. ${archer.name}</div>
+            <div style="font-size: 12px; color: #6b7280;">Skóre: ${archer.scores.join(', ') || '-'}</div>
+          </div>
+          <button onclick="removeArcher(${i})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px;">Zmazať</button>
+        `;
+        archersList.appendChild(div);
+      });
+
+      // Update favorites
+      const favoritesSection = document.getElementById('favoritesSection');
+      const favoritesList = document.getElementById('favoritesList');
+      favoritesSection.style.display = state.favorites.length > 0 ? 'block' : 'none';
+      favoritesList.innerHTML = '';
+
+      state.favorites.forEach(fav => {
+        const div = document.createElement('div');
+        div.className = 'archer-item';
+        div.innerHTML = `
+          <button onclick="addFavoriteAsArcher('${fav}')" style="background: white; border: 1px solid #0891b2; color: #0891b2; padding: 6px 12px; border-radius: 6px; flex: 1; text-align: left;">➕ ${fav}</button>
+          <button onclick="removeFavorite('${fav}')" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px; margin-left: 8px;">🗑️</button>
+        `;
+        favoritesList.appendChild(div);
+      });
+
+      // Update history
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+
+      state.history.slice().reverse().forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${entry.date}</div>
+          <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">${entry.type} • ${entry.targets} terčov</div>
+          <button onclick="loadHistory(${entry.id})" style="background: #ecfdf5; color: #0891b2; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-right: 8px;">Otvoriť</button>
+          <button onclick="deleteHistory(${entry.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px;">🗑️</button>
+        `;
+        historyList.appendChild(div);
+      });
+
+      // Update target type buttons
+      document.getElementById('btn3d').className = state.targetType === '3D' ? 'primary' : 'secondary';
+      document.getElementById('btnTerc').className = state.targetType === 'Terč' ? 'primary' : 'secondary';
+
+      // Offline badge
+      document.getElementById('offlineBadge').style.display = state.isOffline ? 'block' : 'none';
+    }
+
+    function removeArcher(index) {
+      state.archers.splice(index, 1);
+      saveState();
+      updateUI();
+    }
+
+    function loadHistory(id) {
+      const entry = state.history.find(h => h.id === id);
+      if (entry) {
+        state.currentRound = entry.data;
+        state.currentTargetIndex = 0;
+        state.currentArcherIndex = 0;
+        saveState();
+        showPage(3);
+        renderShooting();
+      }
+    }
+
+    function deleteHistory(id) {
+      if (confirm('Vymazať tento tréning z histórie?')) {
+        state.history = state.history.filter(h => h.id !== id);
+        saveState();
+        updateUI();
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('confirmModal').classList.remove('active');
+    }
+
+    // ===== OFFLINE DETECTION =====
+    window.addEventListener('online', () => {
+      state.isOffline = false;
+      updateUI();
+    });
+
+    window.addEventListener('offline', () => {
+      state.isOffline = true;
+      updateUI();
+    });
+
+    // ===== SERVICE WORKER =====
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(e => console.log('SW error:', e));
+    }
+
+    // ===== INIT =====
+    loadState();
+  </script>
+</body>
+</html>
