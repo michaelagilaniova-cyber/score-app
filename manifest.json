@@ -1,0 +1,18 @@
+{
+  "name": "Score - Strelecký denník",
+  "short_name": "Score",
+  "description": "Aplikácia na zaznamenávanie výsledkov lukostrelby s offline funkčnosťou",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0891b2",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%230891b2'/%3E%3Ccircle cx='256' cy='256' r='180' fill='none' stroke='%23ffffff' stroke-width='16'/%3E%3Ccircle cx='256' cy='256' r='120' fill='none' stroke='%23ffffff' stroke-width='16'/%3E%3Ccircle cx='256' cy='256' r='60' fill='%23ffffff'/%3E%3Cpath d='M140 372 L256 256' fill='none' stroke='%23ffffff' stroke-width='24' stroke-linecap='round'/%3E%3Cpath d='M110 402 L140 372 M120 360 L150 390 M100 380 L130 410' fill='none' stroke='%23ffffff' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
